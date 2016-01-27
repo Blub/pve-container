@@ -266,6 +266,7 @@ PVE::JSONSchema::register_standard_option('pve-lxc-snapshot-name', {
     maxLength => 40,
 });
 
+my $feature_desc = {};
 my $confdesc = {
     lock => {
 	optional => 1,
@@ -402,6 +403,11 @@ my $confdesc = {
 	type => 'boolean',
 	description => "Makes the container run as unprivileged user. (Should not be modified manually.)",
 	default => 0,
+    },
+    features => {
+	optional => 1,
+	type => 'string', format => $feature_desc,
+	description => "Enable various features.",
     },
 };
 
@@ -619,6 +625,36 @@ for (my $i = 0; $i < $MAX_MOUNT_POINTS; $i++) {
 
 for (my $i = 0; $i < $MAX_MOUNT_POINTS; $i++) {
     $confdesc->{"unused$i"} = $unuseddesc;
+}
+
+our $apparmor_features = {
+    netmount => {
+	name => "Network mounts",
+	description => "Allow mounting network filesystems (nfs, cifs, 9p)",
+	#permissions => { check => [ 'perm', '/vms/{vmid}', [ 'VM.Config.Network' ]], },
+    },
+    blockmount => {
+	name => "Block mounts",
+	description => "Allow mounting block devices with ext2/3/4, xfs or btrfs filesystems.",
+    },
+    nesting => {
+	name => "Nesting",
+	description => "Allow nested containers.",
+    },
+};
+
+our $ct_features = {};
+
+foreach my $feature (keys %$apparmor_features) {
+    my $data = $apparmor_features->{$feature};
+    $ct_features->{$feature} = $data;
+    $feature_desc->{$feature} = {
+	optional => 1,
+	type => 'boolean',
+	description => $data->{description},
+	format_description => '[0|1]',
+	default => 0,
+    };
 }
 
 sub parse_pct_config {
@@ -1109,6 +1145,12 @@ sub parse_lxc_network {
     }
 
     return $res;
+}
+
+sub parse_features {
+    my ($class, $data) = @_;
+    return {} if !$data;
+    return PVE::JSONSchema::parse_property_string($feature_desc, $data);
 }
 
 sub option_exists {

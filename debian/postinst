@@ -33,6 +33,8 @@ case "$1" in
         /usr/sbin/pve-update-lxc-config
     fi
 
+    /sbin/apparmor_parser -r -W -T /etc/apparmor.d/lxc-containers
+
     # There are three sub-cases:
     if test "${2+set}" != set; then
       # We're being installed by an ancient dpkg which doesn't remember

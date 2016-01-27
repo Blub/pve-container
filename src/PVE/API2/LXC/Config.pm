@@ -15,6 +15,7 @@ use PVE::RESTHandler;
 use PVE::RPCEnvironment;
 use PVE::LXC;
 use PVE::LXC::Create;
+use PVE::API2::LXC::Features;
 use PVE::JSONSchema qw(get_standard_option);
 use base qw(PVE::RESTHandler);
 
@@ -112,7 +113,7 @@ __PACKAGE__->register_method({
 	my $delete_str = extract_param($param, 'delete');
 	my @delete = PVE::Tools::split_list($delete_str);
 
-	PVE::LXC::check_ct_modify_config_perm($rpcenv, $authuser, $vmid, undef, {}, [@delete]);
+	PVE::LXC::check_ct_modify_config_perm($rpcenv, $authuser, $vmid, undef, {}, {}, [@delete]);
 
 	foreach my $opt (@delete) {
 	    raise_param_exc({ delete => "you can't use '-$opt' and " .
@@ -124,14 +125,13 @@ __PACKAGE__->register_method({
 	    }
 	}
 
-	PVE::LXC::check_ct_modify_config_perm($rpcenv, $authuser, $vmid, undef, $param, []);
-
 	my $storage_cfg = cfs_read_file("storage.cfg");
 
 	my $code = sub {
 
 	    my $conf = PVE::LXC::Config->load_config($vmid);
 	    PVE::LXC::Config->check_lock($conf);
+	    PVE::LXC::check_ct_modify_config_perm($rpcenv, $authuser, $vmid, undef, $conf, $param, []);
 
 	    PVE::Tools::assert_if_modified($digest, $conf->{digest});
 

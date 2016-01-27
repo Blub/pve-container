@@ -19,6 +19,7 @@ use PVE::LXC::Migrate;
 use PVE::API2::LXC::Config;
 use PVE::API2::LXC::Status;
 use PVE::API2::LXC::Snapshot;
+use PVE::API2::LXC::Features;
 use PVE::JSONSchema qw(get_standard_option);
 use base qw(PVE::RESTHandler);
 
@@ -44,6 +45,11 @@ __PACKAGE__->register_method ({
 __PACKAGE__->register_method ({
     subclass => "PVE::API2::LXC::Snapshot",
     path => '{vmid}/snapshot',
+});
+
+__PACKAGE__->register_method ({
+    subclass => "PVE::API2::LXC::Features",
+    path => '{vmid}/features',
 });
 
 __PACKAGE__->register_method ({
@@ -226,7 +232,7 @@ __PACKAGE__->register_method({
 	my $ostemplate = extract_param($param, 'ostemplate');
 	my $storage = extract_param($param, 'storage') // 'local';
 
-	PVE::LXC::check_ct_modify_config_perm($rpcenv, $authuser, $vmid, $pool, $param, []);
+	PVE::LXC::check_ct_modify_config_perm($rpcenv, $authuser, $vmid, $pool, {}, $param, []);
 
 	my $storage_cfg = cfs_read_file("storage.cfg");
 
@@ -1367,7 +1373,7 @@ __PACKAGE__->register_method({
 
 	die "no options specified\n" if !scalar(keys %$param);
 
-	PVE::LXC::check_ct_modify_config_perm($rpcenv, $authuser, $vmid, undef, $param, []);
+	PVE::LXC::check_ct_modify_config_perm($rpcenv, $authuser, $vmid, undef, {}, $param, []);
 
 	my $storage_cfg = cfs_read_file("storage.cfg");
 

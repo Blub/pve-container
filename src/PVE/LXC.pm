@@ -13,7 +13,7 @@ use Cwd qw();
 use Fcntl qw(O_RDONLY O_NOFOLLOW O_DIRECTORY);
 use Errno qw(ELOOP ENOTDIR EROFS);
 
-use PVE::Exception qw(raise_perm_exc);
+use PVE::Exception qw(raise_perm_exc raise_param_exc);
 use PVE::Storage;
 use PVE::SafeSyslog;
 use PVE::INotify;
@@ -437,13 +437,28 @@ sub update_lxc_config {
 	$raw .= "lxc.network.mtu = $d->{mtu}\n" if defined($d->{mtu});
     }
 
+    my $features = PVE::LXC::Config->parse_features($conf->{features});
+
+    my @aa_features = grep {
+	$features->{$_} && exists($PVE::LXC::Config::apparmor_features->{$_})
+    } keys %$features;
+    if (@aa_features) {
+	my $aa_profile = join('-', 'lxc-pve', sort(@aa_features));
+	$raw .= "lxc.aa_profile = $aa_profile\n";
+    }
+
     my $had_cpuset = 0;
     if (my $lxcconf = $conf->{lxc}) {
 	foreach my $entry (@$lxcconf) {
 	    my ($k, $v) = @$entry;
 	    $netcount++ if $k eq 'lxc.network.type';
 	    $had_cpuset = 1 if $k eq 'lxc.cgroup.cpuset.cpus';
-	    $raw .= "$k = $v\n";
+	    if (@aa_features && $k eq 'lxc.aa_profile') {
+		my $options = join(', ', @aa_features);
+		die "$k overrides AppArmor related feature options: $options\n";
+	    } else {
+		$raw .= "$k = $v\n";
+	    }
 	}
     }
 
@@ -883,8 +898,48 @@ sub template_create {
     PVE::LXC::Config->write_config($vmid, $conf);
 }
 
+sub check_feature_perms {
+    my ($rpcenv, $authuser, $feature_name, $uri_param, $noerr) = @_;
+    my $feature = $PVE::LXC::Config::ct_features->{$feature_name};
+    if (!$feature) {
+	raise_param_exc({option => "unknown option: '$feature_name'"}) if !$noerr;
+	return 0;
+    }
+
+    my $perms = $feature->{permissions};
+    # If no permissions are defined only root can change a feature
+    if (!$perms && $authuser ne 'root@pam') {
+	raise_perm_exc("only root\@pam can enable feature '$feature_name'") if !$noerr;
+	return 0;
+    }
+    eval { $rpcenv->check_api2_permissions($perms, $authuser, $uri_param); };
+    raise_perm_exc("you do not have permission to enable feature '$feature_name'") if $@ && !$noerr;
+    return !$@;
+}
+
+sub check_modify_features {
+    my ($rpcenv, $authuser, $vmid, $pool, $old_data, $new_data) = @_;
+
+    my $old = eval { PVE::LXC::Config->parse_features($old_data) } || {};
+    my $new = eval { PVE::LXC::Config->parse_features($new_data) };
+    raise_param_exc({option => "$@"}) if $@;
+
+    # Go through features which have been added or changed
+    foreach my $opt (keys %$new) {
+	my $oldvalue = $old->{$opt};
+	my $newvalue = $new->{$opt};
+	if (defined($oldvalue) != defined($newvalue) || $newvalue ne $oldvalue) {
+	    # can always disable boolean features
+	    my $desc = $PVE::LXC::Config::feature_desc->{$opt};
+	    next if $desc->{type} eq 'boolean' && !$newvalue;
+	    # check the permissions:
+	    check_feature_perms($rpcenv, $authuser, $opt, { vmid => $vmid, pool => $pool }, 0);
+	}
+    }
+}
+
 sub check_ct_modify_config_perm {
-    my ($rpcenv, $authuser, $vmid, $pool, $newconf, $delete) = @_;
+    my ($rpcenv, $authuser, $vmid, $pool, $oldconf, $newconf, $delete) = @_;
 
     return 1 if $authuser eq 'root@pam';
 
@@ -904,6 +959,13 @@ sub check_ct_modify_config_perm {
 	} elsif ($opt =~ m/^net\d+$/ || $opt eq 'nameserver' ||
 		 $opt eq 'searchdomain' || $opt eq 'hostname') {
 	    $rpcenv->check_vm_perm($authuser, $vmid, $pool, ['VM.Config.Network']);
+	} elsif ($opt eq 'features') {
+	    if ($delete) {
+		$rpcenv->check_vm_perm($authuser, $vmid, $pool, ['VM.Config.Options']);
+	    } else {
+		check_modify_features($rpcenv, $authuser, $vmid, $pool,
+				      $oldconf->{features}, $newconf->{features});
+	    }
 	} else {
 	    $rpcenv->check_vm_perm($authuser, $vmid, $pool, ['VM.Config.Options']);
 	}
