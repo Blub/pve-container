@@ -1,0 +1,28 @@
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 more.com more
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+10.0.0.1 second-occurrance.must.stay atestname
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+
+test: 1
+# See test.3.9, this file's input is its output plus 'more.com' added back
+# to the 11.0.0.1 address with the container's hostname being 'more.com'
+# In this case we should not remove more.com from 11.0.0.1 unlike in test 3.9
+# where it was considered our main entry to meddle with beause the 10.0.0.1
+# entry did not exist initially.
+  hostip = 10.0.0.1
+  newname = more.com
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 more.com more
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+10.0.0.1 second-occurrance.must.stay atestname
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com

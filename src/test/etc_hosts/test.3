@@ -1,0 +1,167 @@
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+10.0.0.1 second-occurrance.must.stay atestname
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+
+test: 1
+# This file tests against the existing hostname entries
+  hostip = 10.0.0.1
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 localhost
+10.0.0.1 second-occurrance.must.stay atestname
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+end
+
+test: 2
+  newname = atestname
+# A hostname was configured and found in /etc/hosts, no IP was configured
+# so we expect the user to manage /etc/hosts for their custom settings.
+# We'd only add the hostname if it didn't exist before (test.2.2).
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+10.0.0.1 second-occurrance.must.stay atestname
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+end
+
+test: 3
+  hostip = 10.0.0.1
+  newname = atestname
+# In this case we have a line matching both hostname and IP address, so we
+# assume that it's the one line we're managing and replace it completely,
+# but we must not touch the second such line
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 atestname
+10.0.0.1 second-occurrance.must.stay atestname
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+end
+
+test: 5
+  hostip = 10.0.0.1
+  searchdomains = proxmox.com
+# Like in test 3 we assume the first line matching our IP is "our" line.
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 localhost.proxmox.com localhost
+10.0.0.1 second-occurrance.must.stay atestname
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+end
+
+test: 6
+  newname = atestname
+  searchdomains = proxmox.com
+# Same as test 2 above
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+10.0.0.1 second-occurrance.must.stay atestname
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+end
+
+test: 7
+  hostip = 10.0.0.1
+  newname = atestname
+  searchdomains = proxmox.com
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 atestname.proxmox.com atestname
+10.0.0.1 second-occurrance.must.stay atestname
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+end
+
+test: 8
+  newname = atest.fqdn
+# Same as test 2 above
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+10.0.0.1 second-occurrance.must.stay atestname
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+end
+
+test: 9
+# We already had a test matching both in one line
+# so now we match on different lines
+  hostip = 10.0.0.1
+  newname = more.com
+# Note that we only remove more.com from 11.0.0.1, which is fine because our
+# new managed line is now on top and will be matching both IP+hostname, so now
+# if the user adds it back in it'll *stay* there for good. (test.4.1)
+# We simply assumed here that the 11.0.0.1 line was our previous IP and our
+# previously "managed" line.
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 more.com more
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+10.0.0.1 second-occurrance.must.stay atestname
+11.0.0.1 atestname
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+end
+
+test: 10
+  newname = atest.fqdn
+  searchdomains = proxmox.com
+# Same as test 2 above
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+10.0.0.1 second-occurrance.must.stay atestname
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+end
+
+test: 11
+  hostip = 10.0.0.1
+  newname = atest.fqdn
+  searchdomains = proxmox.com
+# Same as test 7 above
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 atest.fqdn atest
+10.0.0.1 second-occurrance.must.stay atestname
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+end

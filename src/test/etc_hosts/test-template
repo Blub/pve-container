@@ -1,0 +1,96 @@
+WRITE INPUT HERE
+
+test: 0
+# Every test file should at least have all of these cases:
+#  0) Empty config
+#  1) hostip
+#  2)          hostname
+#  3) hostip + hostname
+#  4)                     searchdomain
+#  5) hostip       +      searchdomain
+#  6)          hostname + searchdomain
+#  7) hostip + hostname + searchdomain
+#  8)          fqdn
+#  9) hostip + fqdn
+# 10)          fqdn + searchdomain
+# 11) hostip + fqdn + searchdomain
+
+expect:
+COPY INPUT HERE
+127.0.1.1 localhost
+end
+
+test: 1
+  hostip = 192.168.0.1
+expect:
+TODO
+end
+
+test: 2
+  newname = myhost
+expect:
+TODO
+end
+
+test: 3
+  hostip = 192.168.0.1
+  newname = myhost
+expect:
+TODO
+end
+
+test: 4
+  searchdomains = proxmox.com
+expect:
+TODO
+end
+
+test: 5
+  hostip = 192.168.0.1
+  searchdomains = proxmox.com
+expect:
+TODO
+end
+
+test: 6
+  newname = myhost
+  searchdomains = proxmox.com
+expect:
+TODO
+end
+
+test: 7
+  hostip = 192.168.0.1
+  newname = myhost
+  searchdomains = proxmox.com
+expect:
+TODO
+end
+
+test: 8
+  newname = myhost.fqdn.com
+expect:
+TODO
+end
+
+test: 9
+  hostip = 192.168.0.1
+  newname = myhost.fqdn.com
+expect:
+TODO
+end
+
+test: 10
+  newname = myhost.fqdn.com
+  searchdomains = proxmox.com
+expect:
+TODO
+end
+
+test: 11
+  hostip = 2001::1
+  newname = myhost
+  searchdomains = proxmox.com
+expect:
+TODO
+end

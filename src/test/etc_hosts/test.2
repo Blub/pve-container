@@ -1,0 +1,173 @@
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+
+test: 0
+# This test seris should not touch any of the predefined host lines
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+127.0.1.1 localhost
+end
+
+test: 1
+  hostip = 192.168.0.1
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+192.168.0.1 localhost
+end
+
+test: 2
+  newname = myhost
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+127.0.1.1 myhost
+end
+
+test: 3
+  hostip = 192.168.0.1
+  newname = myhost
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+192.168.0.1 myhost
+end
+
+test: 4
+  searchdomains = proxmox.com
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+127.0.1.1 localhost
+end
+
+test: 5
+  hostip = 192.168.0.1
+  searchdomains = proxmox.com
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+192.168.0.1 localhost.proxmox.com localhost
+end
+
+test: 6
+  newname = myhost
+  searchdomains = proxmox.com
+  # here we expect no fqdn for the 127.0.1.1 entry
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+127.0.1.1 myhost
+end
+
+test: 7
+  hostip = 192.168.0.1
+  newname = myhost
+  searchdomains = proxmox.com
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+192.168.0.1 myhost.proxmox.com myhost
+end
+
+test: 8
+  newname = myhost.fqdn.com
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+127.0.1.1 myhost
+end
+
+test: 9
+  hostip = 192.168.0.1
+  newname = myhost.fqdn.com
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+192.168.0.1 myhost.fqdn.com myhost
+end
+
+test: 10
+  newname = myhost.fqdn.com
+  searchdomains = proxmox.com
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+127.0.1.1 myhost
+end
+
+test: 11
+  hostip = 192.168.0.1
+  newname = myhost.fqdn.com
+  searchdomains = proxmox.com
+expect:
+127.0.0.1 localhost.localnet localhost
+::1 localhost.localnet localhost
+
+10.0.0.1 keep.this.here and.this.too atestname atest.fqdn
+11.0.0.1 atestname more.com
+11.0.0.2 atest.fqdn more.com
+11.0.0.3 atestname atest.fqdn more.com
+192.168.0.1 myhost.fqdn.com myhost
+end

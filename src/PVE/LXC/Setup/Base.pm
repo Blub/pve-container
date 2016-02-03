@@ -53,87 +53,151 @@ sub lookup_dns_conf {
     return ($searchdomains, $nameserver);
 }
 
+my $remove_elements = sub {
+    my ($needle_array, @haystack) = @_;
+
+    return grep {
+	my $hay = $_;
+	!grep { $hay eq $_ } @$needle_array
+    } @haystack;
+};
+
 sub update_etc_hosts {
     my ($etc_hosts_data, $hostip, $oldname, $newname, $searchdomains) = @_;
 
     my $done = 0;
 
-    my @lines;
-
     my $namepart = ($newname =~ s/\..*$//r);
 
-    my $all_names = '';
+    # First prepare all the new hostnames we want to use:
+    my @all_names = ();
     if ($newname =~ /\./) {
-	$all_names .= "$newname $namepart";
+	push @all_names, $newname, $namepart;
     } else {
 	foreach my $domain (PVE::Tools::split_list($searchdomains)) {
-	    $all_names .= ' ' if $all_names;
-	    $all_names .= "$newname.$domain";
+	    push @all_names, "$newname.$domain";
 	}
-	$all_names .= ' ' if $all_names;
-	$all_names .= $newname;
+	push @all_names, $newname;
     }
-    
-    foreach my $line (split(/\n/, $etc_hosts_data)) {
-	if ($line =~ m/^#/ || $line =~ m/^\s*$/) {
-	    push @lines, $line;
-	    next;
-	}
+
+    # And remember the default string (used multiple times)
+    my $entry_line;
+    if (defined($hostip)) {
+	$entry_line = "$hostip " . join(' ', @all_names);
+    } else {
+	$entry_line = "127.0.1.1 $namepart";
+    }
+
+    # Now analyze the existing data
+    my $lines = [split(/\n/, $etc_hosts_data)];
+
+    my $ip_line;
+    my $hostname_line;
+    my $both_line;
+    my ($found_lo4, $found_lo6);
+
+    my $addline = sub {
+	my ($after, $line) = @_;
+	splice @$lines, $after, 0, $line;
+	$found_lo4++ if defined($found_lo4) && $found_lo4 >= $after;
+	$found_lo6++ if defined($found_lo6) && $found_lo6 >= $after;
+    };
+
+    foreach my $i (0..(@$lines-1)) {
+	my $line = $lines->[$i];
+	next if $line =~ /^#/ || $line =~ /^\s*$/;
 
 	my ($ip, @names) = split(/\s+/, $line);
-	if (($ip eq '127.0.0.1') || ($ip eq '::1')) {
-	    push @lines, $line;
+
+	if ($ip eq '127.0.0.1') {
+	    $found_lo4 = $i;
 	    next;
 	}
 
-	my $found = 0;
-	foreach my $name (@names) {
-	    if ($name eq $oldname || $name eq $newname) {
-		$found = 1;
-	    } else {
-		# fixme: record extra names?
-	    }
-	}
-	$found = 1 if defined($hostip) && ($ip eq $hostip);
-	
-	if ($found) {
-	    if (!$done) {
-		if (defined($hostip)) {
-		    push @lines, "$hostip $all_names";
-		} else {
-		    push @lines, "127.0.1.1 $namepart";
-		}
-		$done = 1;
-	    }
+	if ($ip eq '::1') {
+	    $found_lo6 = $i;
 	    next;
-	} else {
-	    push @lines, $line;
+	}
+
+	if (!defined($ip_line) && defined($hostip) && $ip eq $hostip) {
+	    $ip_line = $i;
+	    # also check hostname
+	}
+
+	if (!defined($hostname_line) && grep { $_ eq $oldname ||
+	                                       $_ eq $newname ||
+	                                       $_ eq $namepart } @names) {
+	    $hostname_line = $i;
+	    $both_line = $i if defined($ip_line) && $ip_line == $i;
 	}
     }
 
-    if (!$done) {
+    # We we have a few cases to distinguish between:
+    my $add_local_hostname = 1;
+
+    if (defined($both_line)) {
+	# We have a line where both IP and hostname match, so we only replace
+	# this one.
+	$lines->[$both_line] = "$hostip " . join(' ', @all_names);
+    } elsif (defined($hostname_line) && defined($ip_line)) {
+	# We matched two lines: one by IP and one by hostname
+	# The ip line does *not* contain our hostname
+	# The host line does *not* contain our ip
+	# (otherwise we would be in the $both_line case)
+	# So we consider the ip-line "extra" names and the host-line needs
+	# to be stripped of our host names, then we add our entry.
+	my ($ip, @names) = split(/\s+/, $lines->[$hostname_line]);
+	@names = &$remove_elements([$oldname, @all_names], @names);
+	# The hostname line can be empty now:
+	if (!@names) {
+	    $lines->[$hostname_line] = $entry_line;
+	} else {
+	    $lines->[$hostname_line] = "$ip " . join(' ', @names);
+	    my $at = $ip_line < $hostname_line ? $ip_line : $hostname_line;
+	    &$addline($at, $entry_line);
+	}
+    } elsif (defined($hostname_line)) {
+	# There's a line containing our hostname but not our ip address, and no
+	# other line contains our ip address either, so clear out the name to
+	# replace it, but only if we actually have a configured IP address,
+	# otherwise it's up to the user to deal with this:
 	if (defined($hostip)) {
-	    push @lines, "$hostip $all_names";
+	    my ($ip, @names) = split(/\s+/, $lines->[$hostname_line]);
+	    @names = &$remove_elements([$oldname, @all_names], @names);
+	    if (@names) {
+		$lines->[$hostname_line] = "$ip " . join(' ', @names);
+		&$addline($hostname_line, $entry_line);
+	    } else {
+		splice @$lines, $hostname_line, 1, $entry_line;
+	    }
 	} else {
-	    push @lines, "127.0.1.1 $namepart";
-	}	
-    }
-
-    my $found_localhost = 0;
-    foreach my $line (@lines) {
-	if ($line =~ m/^127.0.0.1\s/) {
-	    $found_localhost = 1;
-	    last;
+	    # If we don't know our IP leave the entry as it ias and don't add
+	    # an 127.0.1.1 either.
+	    $add_local_hostname = 0;
 	}
+    } elsif (defined($ip_line)) {
+	# We found a line containing our IP address, we simply replace the first
+	# such occurrance with our data:
+	$lines->[$ip_line] = $entry_line;
+	$add_local_hostname = 0;
+    } else {
+	# Neither hostname nor IP existed before, append:
+	push @$lines, $entry_line;
+	$add_local_hostname = 0;
     }
 
-    if (!$found_localhost) {
-	unshift @lines, "127.0.0.1 localhost.localnet localhost";
+    if ($add_local_hostname && !defined($hostip)) {
+	push @$lines, "127.0.1.1 $namepart";
     }
-    
-    $etc_hosts_data = join("\n", @lines) . "\n";
-    
-    return $etc_hosts_data;
+
+    if (!defined($found_lo6)) {
+	&$addline(($found_lo4//-1) + 1, "::1 localhost.localnet localhost");
+    }
+    if (!defined($found_lo4)) {
+	unshift @$lines, "127.0.0.1 localhost.localnet localhost";
+    }
+
+    return join("\n", @$lines) . "\n";
 }
 
 sub template_fixup {
