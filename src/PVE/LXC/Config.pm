@@ -403,6 +403,11 @@ my $confdesc = {
 	description => "Makes the container run as unprivileged user. (Should not be modified manually.)",
 	default => 0,
     },
+    devices => {
+	optional => 1,
+	type => 'string',
+	description => "Device nodes to pass through.",
+    },
 };
 
 my $valid_lxc_conf_keys = {

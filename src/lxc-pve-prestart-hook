@@ -96,11 +96,15 @@ __PACKAGE__->register_method ({
 	my $lxc_setup = PVE::LXC::Setup->new($conf, $rootdir);
 	$lxc_setup->pre_start_hook();
 
+	push @$devices, PVE::Tools::split_list($conf->{devices})
+	    if $conf->{devices};
+
 	if (@$devices) {
 	    my $devlist = '';
 	    foreach my $dev (@$devices) {
 		my ($mode, $rdev) = (stat($dev))[2,6];
-		next if !$mode || !S_ISBLK($mode) || !$rdev;
+		$rdev &= 0xffff;
+		next if !$mode || !$rdev;
 		my $major = int($rdev / 0x100);
 		my $minor = $rdev % 0x100;
 		$devlist .= "b:$major:$minor:$dev\n";
