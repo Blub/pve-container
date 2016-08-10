@@ -1219,7 +1219,7 @@ sub mountpoint_mount {
 
 	if ($format eq 'subvol') {
 	    if ($mount_path) {
-		if ($snapname) {
+		if ($snapname && $scfg->{type} ne 'btrfs') {
 		    if ($scfg->{type} eq 'zfspool') {
 			my $path_arg = $path;
 			$path_arg =~ s!^/+!!;
@@ -1372,7 +1372,7 @@ sub create_disks {
 							   undef, 0);
 			push @$chown_vollist, $volid;
 		    }
-		} elsif ($scfg->{type} eq 'zfspool') {
+		} elsif ($scfg->{type} eq 'zfspool' || $scfg->{type} eq 'btrfs') {
 
 		    $volid = PVE::Storage::vdisk_alloc($storecfg, $storage, $vmid, 'subvol',
 					               undef, $size_kb);
