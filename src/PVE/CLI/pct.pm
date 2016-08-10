@@ -283,6 +283,11 @@ __PACKAGE__->register_method({
 	additionalProperties => 0,
 	properties => {
 	    vmid => get_standard_option('pve-vmid', { completion => \&PVE::LXC::complete_ctid }),
+	    snapshot => {
+		type => 'string',
+		optional => 1,
+		description => "The snapshot to mount.",
+	    },
 	},
     },
     returns => { type => 'null' },
@@ -295,7 +300,17 @@ __PACKAGE__->register_method({
 	my $storecfg = PVE::Storage::config();
 	PVE::LXC::Config->lock_config($vmid, sub {
 	    my $conf = PVE::LXC::Config->set_lock($vmid, 'mounted');
-	    PVE::LXC::mount_all($vmid, $storecfg, $conf);
+
+	    my $snapshot = extract_param($param, 'snapshot');
+
+	    if ($snapshot) {
+		my $snaps = $conf->{snapshots}
+		    or die "No snapshots available\n";
+		$conf = $snaps->{$snapshot}
+		    or die "No such snapshot: $snapshot\n";
+	    }
+
+	    PVE::LXC::mount_all($vmid, $storecfg, $conf, 0, $snapshot);
 	});
 	return undef;
     }});

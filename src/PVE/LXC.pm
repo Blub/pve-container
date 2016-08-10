@@ -952,13 +952,13 @@ sub umount_all {
 }
 
 sub mount_all {
-    my ($vmid, $storage_cfg, $conf, $ignore_ro) = @_;
+    my ($vmid, $storage_cfg, $conf, $ignore_ro, $snapshot) = @_;
 
     my $rootdir = "/var/lib/lxc/$vmid/rootfs";
     File::Path::make_path($rootdir);
 
     my $volid_list = PVE::LXC::Config->get_vm_volumes($conf);
-    PVE::Storage::activate_volumes($storage_cfg, $volid_list);
+    PVE::Storage::activate_volumes($storage_cfg, $volid_list, $snapshot);
 
     eval {
 	PVE::LXC::Config->foreach_mountpoint($conf, sub {
@@ -966,7 +966,7 @@ sub mount_all {
 
 	    $mountpoint->{ro} = 0 if $ignore_ro;
 
-	    mountpoint_mount($mountpoint, $rootdir, $storage_cfg);
+	    mountpoint_mount($mountpoint, $rootdir, $storage_cfg, $snapshot);
         });
     };
     if (my $err = $@) {
