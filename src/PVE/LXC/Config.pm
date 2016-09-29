@@ -531,6 +531,12 @@ our $netconf_desc = {
 	description => "Controls whether this interface's firewall rules should be used.",
 	optional => 1,
     },
+    macfilter => {
+	type => 'boolean',
+	description => 'Only allow network packets with a matching source MAC address.',
+	optional => 1,
+	default => 1,
+    },
     tag => {
 	type => 'integer',
 	minimum => 1,

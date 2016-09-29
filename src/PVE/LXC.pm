@@ -647,6 +647,13 @@ sub update_net {
 		PVE::Network::tap_rate_limit($veth, $newnet->{rate});
 		$oldnet->{rate} = $newnet->{rate}
 	    }
+
+	    if (&$safe_num_ne($oldnet->{macfilter}, $newnet->{macfilter})) {
+		my $macaddr = $newnet->{hwaddr}
+		    if !defined($newnet->{macfilter}) || $newnet->{macfilter};
+		PVE::Network::set_mac_filter($veth, $macaddr);
+		$oldnet->{macfilter} = $newnet->{macfilter}
+	    }
 	    $conf->{$opt} = PVE::LXC::Config->print_lxc_network($oldnet);
 	    PVE::LXC::Config->write_config($vmid, $conf);
 	}
@@ -666,6 +673,9 @@ sub hotplug_net {
 
     PVE::Network::veth_create($veth, $vethpeer, $newnet->{bridge}, $newnet->{hwaddr});
     PVE::Network::tap_plug($veth, $newnet->{bridge}, $newnet->{tag}, $newnet->{firewall}, $newnet->{trunks}, $newnet->{rate});
+    my $macaddr = $newnet->{hwaddr}
+	if !defined($newnet->{macfilter}) || $newnet->{macfilter};
+    PVE::Network::set_mac_filter($veth, $macaddr);
 
     # attach peer in container
     my $cmd = ['lxc-device', '-n', $vmid, 'add', $vethpeer, "$eth" ];
