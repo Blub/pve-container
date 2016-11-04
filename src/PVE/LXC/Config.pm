@@ -266,6 +266,84 @@ PVE::JSONSchema::register_standard_option('pve-lxc-snapshot-name', {
     maxLength => 40,
 });
 
+# - Defaults to system-inherited limits.
+# - A value of -1 means infinite
+# - A value of -2 means explicitly inherit resources (has no real usecase)
+my $rlimits_desc = {
+    as => {
+	type => 'integer', optional => 1,
+	description => "Maximum size of a process' virtual memory (address space) in bytes.",
+	minimum => -2,
+    },
+    core => {
+	type => 'integer', optional => 1,
+	description => "Maximum size of a core dump. When 0 no core dump files are created. Otherwise they are truncated to this size.",
+	minimum => -2,
+    },
+    #cpu => Really makes no sense for containers
+    data => {
+	type => 'integer', optional => 1,
+	description => "Maximum size of a process' data segment (initialized, uninitialized and heap).",
+	minimum => -2,
+    },
+    fsize => { # Really something that should be left up to the container...
+	type => 'integer', optional => 1,
+	description => "Maximum size a process is allowed to extend a file to.",
+	minimum => -2,
+    },
+    locks => { # Also something you don't want to change usually.
+	type => 'integer', optional => 1,
+	description => "Limits on the number of flock() locks and fcntl() locks of processes.",
+	minimum => -2,
+    },
+    memlock => {
+	type => 'integer', optional => 1,
+	description => "Limit the amount of memory that may be locked into RAM (not swappable).",
+	minimum => -2,
+    },
+    # msgqueue => Weird for containers
+    nice => {
+	type => 'integer', optional => 1,
+	description => "Specifies the maximum allowed nice level. In this case the niceness is inverted and mapped to the range 1 to 40, with 1 being the equivalent of niceness 19, 20 being the equivalent of 0 and 40 being the equivalent of -20 with regards to the nice(1) command line utility.",
+	minimum => -2,
+    },
+    nofile => {
+	type => 'integer', optional => 1,
+	description => "",
+	minimum => -2,
+    },
+    nproc => {
+	type => 'integer', optional => 1,
+	description => "",
+	minimum => -2,
+    },
+    rss => {
+	type => 'integer', optional => 1,
+	description => "",
+	minimum => -2,
+    },
+    rtprio => {
+	type => 'integer', optional => 1,
+	description => "",
+	minimum => -2,
+    },
+    rttime => {
+	type => 'integer', optional => 1,
+	description => "",
+	minimum => -2,
+    },
+    sigpending => {
+	type => 'integer', optional => 1,
+	description => "",
+	minimum => -2,
+    },
+    stack => {
+	type => 'integer', optional => 1,
+	description => "",
+	minimum => -2,
+    },
+};
+
 my $confdesc = {
     lock => {
 	optional => 1,
@@ -402,6 +480,11 @@ my $confdesc = {
 	type => 'boolean',
 	description => "Makes the container run as unprivileged user. (Should not be modified manually.)",
 	default => 0,
+    },
+    rlimits => {
+	optional => 1,
+	type => 'string', format => $rlimits_desc,
+	description => "Set container resource limits.",
     },
 };
 
@@ -661,7 +744,7 @@ sub parse_pct_config {
 	    my $key = $1;
 	    my $value = $3;
 	    my $validity = $valid_lxc_conf_keys->{$key} || 0;
-	    if ($validity eq 1 || $key =~ m/^lxc\.cgroup\./) {
+	    if ($validity eq 1 || $key =~ m/^lxc\.(?:cgroup|limit)\./) {
 		push @{$conf->{lxc}}, [$key, $value];
 	    } elsif (my $errmsg = $validity) {
 		warn "vm $vmid - $key: $errmsg\n";
