@@ -1163,6 +1163,9 @@ __PACKAGE__->register_method({
 
 	my $storage = extract_param($param, 'storage');
 
+	die "Full clone requires a target storage.\n"
+	    if $param->{full} && !$storage;
+
         my $localnode = PVE::INotify::nodename();
 
 	my $storecfg = PVE::Storage::config();
@@ -1216,10 +1219,8 @@ __PACKAGE__->register_method({
 		    if ($mp->{type} eq 'volume') {
 			my $volid = $mp->{volume};
 			if ($param->{full}) {
-			    die "fixme: full clone not implemented";
-
-			    die "Full clone feature for '$volid' is not available\n"
-				if !PVE::Storage::volume_has_feature($storecfg, 'copy', $volid, $snapname, $running);
+			    die "Cannot do full clones on a running container without snapshots\n"
+				if $running && !defined($snapname);
 			    $fullclone->{$opt} = 1;
 			} else {
 			    # not full means clone instead of copy
@@ -1267,17 +1268,20 @@ __PACKAGE__->register_method({
 			my $mp = $mountpoints->{$opt};
 			my $volid = $mp->{volume};
 
+			my $newvolid;
 			if ($fullclone->{$opt}) {
-			    die "fixme: full clone not implemented\n";
+			    print "create full clone of mountpoint $opt ($volid)\n";
+			    $newvolid = PVE::LXC::copy_volume($mp, $newid, $storage, $storecfg, $conf, $snapname);
 			} else {
 			    print "create linked clone of mount point $opt ($volid)\n";
-			    my $newvolid = PVE::Storage::vdisk_clone($storecfg, $volid, $newid, $snapname);
-			    push @$newvollist, $newvolid;
-			    $mp->{volume} = $newvolid;
-
-			    $newconf->{$opt} = PVE::LXC::Config->print_ct_mountpoint($mp, $opt eq 'rootfs');
-			    PVE::LXC::Config->write_config($newid, $newconf);
+			    $newvolid = PVE::Storage::vdisk_clone($storecfg, $volid, $newid, $snapname);
 			}
+
+			push @$newvollist, $newvolid;
+			$mp->{volume} = $newvolid;
+
+			$newconf->{$opt} = PVE::LXC::Config->print_ct_mountpoint($mp, $opt eq 'rootfs');
+			PVE::LXC::Config->write_config($newid, $newconf);
 		    }
 
 		    delete $newconf->{lock};
