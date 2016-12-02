@@ -1541,5 +1541,69 @@ sub userns_command {
     return [];
 }
 
+sub copy_volume {
+    my ($mp, $vmid, $storage, $storage_cfg, $conf, $snapname) = @_;
+
+    die "cannot copy volumes of type $mp->{type}\n" if $mp->{type} ne 'volume';
+    my $mount_dir = "/tmp/ct$vmid.copy-volume";
+    my $dest = "$mount_dir\/dest";
+    my $src =  "$mount_dir\/src";
+
+    # get id's for unprivileged container
+    my (undef, $rootuid, $rootgid) = parse_id_maps($conf);
+
+    my $new_volid;
+    my $mounted = 0;
+    $mp = {%$mp};
+    eval {
+	mkdir $mount_dir;
+	mkdir $src or die "failed to create temporary mount directory: $!";
+	mkdir $dest or die "failed to create temporary mount directory: $!";
+
+	my $needs_chown;
+	($new_volid, $needs_chown) = alloc_disk($storage_cfg, $vmid, $storage, $mp->{size}/1024, $rootuid, $rootgid);
+	if ($needs_chown) {
+	    PVE::Storage::activate_volumes($storage_cfg, [$new_volid], undef);
+	    my $path = PVE::Storage::path($storage_cfg, $new_volid, undef);
+	    chown($rootuid, $rootgid, $path);
+	}
+
+	#simplify mount struct. See mountpoint_mount().
+	$mp->{mp} = '/';
+
+	my $new_mp = {%$mp};
+	$new_mp->{volume} = $new_volid;
+
+	# mount and copy
+	mountpoint_mount($mp, $src, $storage_cfg, $snapname);
+	$mounted = 1;
+	mountpoint_mount($new_mp, $dest, $storage_cfg);
+	$mounted = 2;
+
+	PVE::Tools::run_command(['/usr/bin/rsync', '--stats', '-X', '-A', '--numeric-ids',
+				 '-aH', '--whole-file', '--sparse', '--one-file-system',
+				 "$src/", $dest]);
+    };
+    my $err = $@;
+    if ($mounted >= 2) {
+	eval { PVE::Tools::run_command(['/bin/umount', '--lazy', $dest], errfunc => sub{})};
+	warn "Can't umount $src\n" if $@;
+    }
+    if ($mounted >= 1) {
+	eval { PVE::Tools::run_command(['/bin/umount', '--lazy', $src], errfunc => sub{})};
+	warn "Can't umount $src\n" if $@;
+    }
+
+    rmdir $dest;
+    rmdir $src;
+    rmdir $mount_dir or warn "failed to remove $mount_dir: $!\n";
+
+    if ($err) {
+	PVE::Storage::vdisk_free($storage_cfg, $new_volid)
+	    if defined($new_volid);
+	die $err;
+    }
+    return $new_volid;
+}
 
 1;
