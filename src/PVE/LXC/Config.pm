@@ -540,7 +540,7 @@ our $netconf_desc = {
     },
     trunks => {
 	type => 'string',
-	pattern => qr/\d+(?:;\d+)*/,
+	pattern => qr/\d+(?:-\d+)?(?:;\d+(?:-\d+)?)*/,
 	format_description => 'vlanid[;vlanid...]',
 	description => "VLAN ids to pass through the interface",
 	optional => 1,
