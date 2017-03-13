@@ -7,6 +7,7 @@ use POSIX qw(EINTR);
 
 use Socket;
 
+use IO::File;
 use File::Path;
 use File::Spec;
 use Cwd qw();
