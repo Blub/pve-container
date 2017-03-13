@@ -281,7 +281,9 @@ sub read_cgroup_list {
 sub read_cgroup_value {
     my ($group, $vmid, $name, $full) = @_;
 
-    my $path = "/sys/fs/cgroup/$group/lxc/$vmid/$name";
+    my $subsys_path = lxc_cmd_get_cgroup($vmid, $group);
+
+    my $path = "/sys/fs/cgroup/$group/$subsys_path/$name";
 
     return PVE::Tools::file_get_contents($path) if $full;
 
@@ -289,11 +291,11 @@ sub read_cgroup_value {
 }
 
 sub write_cgroup_value {
-   my ($group, $vmid, $name, $value) = @_;
+    my ($group, $vmid, $name, $value) = @_;
 
-   my $path = "/sys/fs/cgroup/$group/lxc/$vmid/$name";
-   PVE::ProcFSTools::write_proc_entry($path, $value) if -e $path;
-
+    my $subsys_path = lxc_cmd_get_cgroup($vmid, $group);
+    my $path = "/sys/fs/cgroup/$group/$subsys_path/$name";
+    PVE::ProcFSTools::write_proc_entry($path, $value) if -e $path;
 }
 
 sub find_lxc_console_pids {
