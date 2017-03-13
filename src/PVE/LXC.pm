@@ -8,6 +8,7 @@ use POSIX qw(EINTR);
 use Socket;
 
 use IO::File;
+use IO::Socket::UNIX;
 use File::Path;
 use File::Spec;
 use Cwd qw();
@@ -37,6 +38,18 @@ our $COMMON_TAR_FLAGS = [ '--sparse', '--numeric-owner', '--acls',
                           '--xattrs-include=user.*',
                           '--xattrs-include=security.capability',
                           '--warning=no-xattr-write' ];
+use constant {
+	LXC_CMD_CONSOLE         => 0,
+	LXC_CMD_CONSOLE_WINCH   => 1,
+	LXC_CMD_STOP            => 2,
+	LXC_CMD_GET_STATE       => 3,
+	LXC_CMD_GET_INIT_PID    => 4,
+	LXC_CMD_GET_CLONE_FLAGS => 5,
+	LXC_CMD_GET_CGROUP      => 6,
+	LXC_CMD_GET_CONFIG_ITEM => 7,
+	LXC_CMD_GET_NAME        => 8,
+	LXC_CMD_GET_LXCPATH     => 9,
+};
 
 sub config_list {
     my $vmlist = PVE::Cluster::get_vmlist();
@@ -1517,5 +1530,49 @@ sub userns_command {
     return [];
 }
 
+my $lxc_cmd = sub {
+    my ($sock, $cmd, $data) = @_;
+
+    # lxc_cmd contains a useless pointer at the end which we fill with zero
+    my $head = pack('LLP', $cmd, length($data), 0) . $data;
+    my $sent = send($sock, $head, 0);
+    die "send failed: $!\n" if !defined($sent);
+    die "short send(): $!\n" if $sent != length($head);
+
+    my $got = recv($sock, my $rsp, 1024, 0);
+    die "recv failed: $!\n" if !defined($got);
+    die "empty response\n" if !length($rsp);
+
+    # lxc_rsp is the same as lxc_cmd, also contains a useless pointer to skip
+    my ($err, $len, undef, $raw) = unpack('LLL!a*', $rsp);
+    die "bad response\n"
+	if $len != length($raw);
+    die "lxc command returned an error code: $err"
+	if $err != 0;
+    return $raw;
+};
+
+my $lxc_cmd_connect = sub {
+    my ($vmid) = @_;
+
+    # abstract socket names start with \0
+    my $addr = pack_sockaddr_un("\0/var/lib/lxc/$vmid/command");
+
+    my $sock = IO::Socket::UNIX->new(Type => SOCK_STREAM)
+	or die "socket: $!\n";
+
+    # lxc checks credentials
+    $sock->setsockopt(SOL_SOCKET, SO_PASSCRED, 1);
+
+    connect($sock, $addr) or die "connection failed: $!\n";
+    return $sock;
+};
+
+sub lxc_cmd_get_cgroup($$) {
+    my ($vmid, $subsystem) = @_;
+    my $sock = $lxc_cmd_connect->($vmid);
+    my $data = $lxc_cmd->($sock, LXC_CMD_GET_CGROUP, pack('Z*', $subsystem));
+    return unpack('Z*', $data);
+}
 
 1;
